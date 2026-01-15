@@ -2,10 +2,12 @@ package com.example.consoleapp.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+val BgDark = Color(0xFF0B1220)
+val SurfaceDark = Color(0xFF121B2B)
+val SurfaceDark2 = Color(0xFF172236)
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+val AccentGreen = Color(0xFF19D3A5)
+val AccentBlue = Color(0xFF3B82F6)
+
+val TextHigh = Color(0xFFE8EEF9)
+val TextMid = Color(0xFFB7C0D1)
