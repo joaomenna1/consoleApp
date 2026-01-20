@@ -14,18 +14,22 @@ import com.example.consoleapp.ui.components.ControlPadCard
 import com.example.consoleapp.ui.components.StatusRow
 import com.example.consoleapp.ui.components.TelemetryCard
 import com.example.consoleapp.ui.components.TopHeader
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.consoleapp.domain.input.JoystickEvent
+import androidx.compose.foundation.background
+import androidx.compose.material3.MaterialTheme
+
 
 
 @Composable
 fun ControllerScreen(
-    vm: ControllerViewModel = viewModel()
+    vm: ControllerViewModel
 ) {
     val state by vm.uiState.collectAsState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background) // ✅ garante fundo escuro
             .padding(horizontal = 16.dp)
             .padding(bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -45,15 +49,15 @@ fun ControllerScreen(
         TelemetryCard(axisX = state.axisX, axisY = state.axisY)
 
         ControlPadCard(
-            onUp = vm::pressUp,
-            onDown = vm::pressDown,
-            onLeft = vm::pressLeft,
-            onRight = vm::pressRight,
-            onRelease = vm::release
+            onUp = { vm.onJoystickEvent(JoystickEvent.Axis(x = 0f, y = 1f)) },
+            onDown = { vm.onJoystickEvent(JoystickEvent.Axis(x = 0f, y = -1f)) },
+            onLeft = { vm.onJoystickEvent(JoystickEvent.Axis(x = -1f, y = 0f)) },
+            onRight = { vm.onJoystickEvent(JoystickEvent.Axis(x = 1f, y = 0f)) },
+            onRelease = { vm.onJoystickEvent(JoystickEvent.Axis(x = 0f, y = 0f)) }
         )
 
         Footer(
-            broker = state.broker,
+            broker = state.brokerHost,
             topic = state.topic
         )
     }

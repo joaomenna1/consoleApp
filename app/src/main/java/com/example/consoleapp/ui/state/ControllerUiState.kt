@@ -1,10 +1,11 @@
 package com.example.consoleapp.ui.state
 
 data class ControllerUiState(
-    val joystickConnected: Boolean = true,
-    val mqttConnected: Boolean = true,
+    val joystickConnected: Boolean = false,
+    val mqttConnected: Boolean = false,
     val axisX: Double = 0.0,
     val axisY: Double = 0.0,
-    val broker: String = "path-broker",
+    val brokerHost: String = "broker.hivemq.com",
+    val brokerPort: Int = 1883,
     val topic: String = "arm/cmd"
 )
