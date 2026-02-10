@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 
 @Composable
-fun Footer(broker: String, topic: String) {
+fun Footer(path: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -26,14 +26,9 @@ fun Footer(broker: String, topic: String) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "MQTT Broker: $broker",
+                text = "WebSocket Server: $path",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
-            )
-            Text(
-                text = "topic: $topic",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
             )
         }
     }

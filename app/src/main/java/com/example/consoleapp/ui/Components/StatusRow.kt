@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun StatusRow(
     joystickConnected: Boolean,
-    mqttConnected: Boolean
+    wsConnected: Boolean
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -39,8 +39,8 @@ fun StatusRow(
             modifier = Modifier.weight(1f)
         )
         StatusChip(
-            text = if (mqttConnected) "MQTT Connected" else "MQTT Disconnected",
-            ok = mqttConnected,
+            text = if (wsConnected) "WS Connected" else "WS Disconnected",
+            ok = wsConnected,
             modifier = Modifier.weight(1f)
         )
     }

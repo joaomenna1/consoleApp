@@ -43,7 +43,7 @@ fun ControllerScreen(
 
         StatusRow(
             joystickConnected = state.joystickConnected,
-            mqttConnected = state.mqttConnected
+            wsConnected = state.wsConnected
         )
 
         TelemetryCard(axisX = state.axisX, axisY = state.axisY)
@@ -57,8 +57,7 @@ fun ControllerScreen(
         )
 
         Footer(
-            broker = state.brokerHost,
-            topic = state.topic
+           path = state.wsPath
         )
     }
 }

@@ -1,12 +1,13 @@
 package com.example.consoleapp.ui.screen
 
-
 import android.util.Log
 import android.view.KeyEvent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.consoleapp.data.MqttRepository
+import com.example.consoleapp.data.WebSocketRepository
 import com.example.consoleapp.domain.input.JoystickEvent
+import com.example.consoleapp.types.Action
+import com.example.consoleapp.types.Part
 import com.example.consoleapp.ui.state.ControllerUiState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -14,40 +15,31 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.nio.charset.StandardCharsets
 
 private const val TAG = "ControllerVM"
 
-class ControllerViewModel: ViewModel() {
+class ControllerViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(ControllerUiState())
     val uiState: StateFlow<ControllerUiState> = _uiState
 
-    private val mqttRepo = MqttRepository(
-        host = "broker.hivemq.com",
-        port = 1883,
-        clientId = "consoleapp-android"
+    private val wsRepo = WebSocketRepository(
+        host = _uiState.value.espHost,
+        port = _uiState.value.espPort,
+        path = _uiState.value.wsPath
     )
 
-
-    private var axisPublishJob: Job? = null
+    // Para “segurar botão” e repetir comando:
+    private var repeatJob: Job? = null
 
     init {
-        Log.d(TAG, "VM init -> broker=${_uiState.value.brokerHost}, topic=${_uiState.value.topic}")
-        Log.d(TAG, "Trying to connect to MQTT broker...")
-
-        mqttRepo.connect(
-            onConnected = {
-                Log.i(TAG, "MQTT connected ✅")
-                _uiState.update { it.copy(mqttConnected = true) }
-            },
-            onDisconnected = {
-                Log.w(TAG, "MQTT disconnected ⚠️")
-                _uiState.update { it.copy(mqttConnected = false) }
-            },
+        Log.d(TAG, "Connecting WS...")
+        wsRepo.connect(
+            onConnected = { _uiState.update { it.copy(wsConnected = true) } },
+            onDisconnected = { _uiState.update { it.copy(wsConnected = false) } },
             onError = { err ->
-                Log.e(TAG, "MQTT error ❌", err)
-                _uiState.update { it.copy(mqttConnected = false) }
+                Log.e(TAG, "WS error", err)
+                _uiState.update { it.copy(wsConnected = false) }
             }
         )
     }
@@ -55,45 +47,83 @@ class ControllerViewModel: ViewModel() {
     fun onJoystickEvent(event: JoystickEvent) {
         when (event) {
             is JoystickEvent.Axis -> {
-                Log.v(TAG, "Axis event -> x=${event.x}, y=${event.y}")
+
                 _uiState.update { it.copy(axisX = event.x.toDouble(), axisY = event.y.toDouble()) }
-                scheduleAxisPublish(event.x, event.y)
+                // quando o joystick estiver pronto no driver, ja tem essa base
             }
 
             is JoystickEvent.Button -> {
-                Log.d(TAG, "Button event -> code=${event.code}, pressed=${event.pressed}")
-                if (event.code == KeyEvent.KEYCODE_BUTTON_A) {
-                    publishData(event.pressed)
-                }
+                handleButton(event.code, event.pressed)
             }
         }
     }
 
-    private fun scheduleAxisPublish(x: Float, y: Float) {
-        axisPublishJob?.cancel()
-        axisPublishJob = viewModelScope.launch {
-            delay(40)
-            publishAxis(x, y)
+    private fun send(part: Part, action: Action) {
+        wsRepo.sendCommand(part.value, action.value)
+    }
+
+    private fun handleButton(code: Int, pressed: Boolean) {
+        when (code) {
+
+            KeyEvent.KEYCODE_DPAD_LEFT ->
+                repeatWhilePressed(pressed) { send(Part.Base, Action.LEFT) }
+
+            KeyEvent.KEYCODE_DPAD_RIGHT ->
+                repeatWhilePressed(pressed) { send(Part.Base, Action.RIGHT) }
+
+            KeyEvent.KEYCODE_DPAD_UP ->
+                repeatWhilePressed(pressed) { send(Part.Shoulder, Action.UP) }
+
+            KeyEvent.KEYCODE_DPAD_DOWN ->
+                repeatWhilePressed(pressed) { send(Part.Shoulder, Action.DOWN) }
+
+            KeyEvent.KEYCODE_BUTTON_L1 ->
+                repeatWhilePressed(pressed) { send(Part.Elbow, Action.DOWN) }
+
+            KeyEvent.KEYCODE_BUTTON_R1 ->
+                repeatWhilePressed(pressed) { send(Part.Elbow, Action.UP) }
+
+            KeyEvent.KEYCODE_BUTTON_A ->
+                if (pressed) send(Part.Gripper, Action.CLOSE)
+
+            KeyEvent.KEYCODE_BUTTON_B ->
+                if (pressed) send(Part.Gripper, Action.OPEN)
+
+            KeyEvent.KEYCODE_BUTTON_START ->
+                if (pressed) send(Part.Home, Action.GO)
+
+            KeyEvent.KEYCODE_BUTTON_SELECT ->
+                if (pressed) toggleDemo()
         }
     }
 
-    private fun publishAxis(x: Float, y: Float) {
-        val topic = _uiState.value.topic
-        val payload = """{"x":${"%.3f".format(x)},"y":${"%.3f".format(y)}}"""
-        Log.d(TAG, "Publish axis -> topic=$topic payload=$payload")
-        mqttRepo.publish(topic, payload.toByteArray(StandardCharsets.UTF_8), qos = 0, retained = false)
+
+    private var demoOn = false
+    private fun toggleDemo() {
+        demoOn = !demoOn
+        send(Part.Demo, if (demoOn) Action.ON else Action.OFF)
     }
 
-    private fun publishData(pressed: Boolean) {
-        val topic = _uiState.value.topic
-        val payload = """{"data":"A","pressed":$pressed}"""
-        Log.d(TAG, "Publish data -> topic=$topic payload=$payload")
-        mqttRepo.publish(topic, payload.toByteArray(StandardCharsets.UTF_8), qos = 0, retained = false)
+    private fun repeatWhilePressed(pressed: Boolean, send: () -> Unit) {
+        if (pressed) {
+            if (repeatJob?.isActive == true) return
+            repeatJob = viewModelScope.launch {
+
+                send()
+
+                while (true) {
+                    delay(90)
+                    send()
+                }
+            }
+        } else {
+            repeatJob?.cancel()
+            repeatJob = null
+        }
     }
 
     override fun onCleared() {
-        Log.d(TAG, "VM cleared -> disconnecting MQTT")
         super.onCleared()
-        mqttRepo.disconnect()
+        wsRepo.disconnect()
     }
 }
