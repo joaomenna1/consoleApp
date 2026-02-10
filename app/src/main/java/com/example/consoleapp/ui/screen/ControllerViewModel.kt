@@ -32,24 +32,34 @@ class ControllerViewModel : ViewModel() {
     // Para “segurar botão” e repetir comando:
     private var repeatJob: Job? = null
 
-    init {
+    // ✅ garante que não vai tentar conectar mais de uma vez
+    private var started = false
+
+    // ✅ Chame isso a partir da UI (ControllerScreen) com LaunchedEffect(Unit)
+    fun ensureConnected() {
+        if (started) return
+        started = true
+
         Log.d(TAG, "Connecting WS...")
-        wsRepo.connect(
-            onConnected = { _uiState.update { it.copy(wsConnected = true) } },
-            onDisconnected = { _uiState.update { it.copy(wsConnected = false) } },
-            onError = { err ->
-                Log.e(TAG, "WS error", err)
-                _uiState.update { it.copy(wsConnected = false) }
-            }
-        )
+        runCatching {
+            wsRepo.connect(
+                onConnected = { _uiState.update { it.copy(wsConnected = true) } },
+                onDisconnected = { _uiState.update { it.copy(wsConnected = false) } },
+                onError = { err ->
+                    Log.e(TAG, "WS error (callback)", err)
+                    _uiState.update { it.copy(wsConnected = false) }
+                }
+            )
+        }.onFailure { t ->
+            Log.e(TAG, "WS connect crashed", t)
+            _uiState.update { it.copy(wsConnected = false) }
+        }
     }
 
     fun onJoystickEvent(event: JoystickEvent) {
         when (event) {
             is JoystickEvent.Axis -> {
-
                 _uiState.update { it.copy(axisX = event.x.toDouble(), axisY = event.y.toDouble()) }
-                // quando o joystick estiver pronto no driver, ja tem essa base
             }
 
             is JoystickEvent.Button -> {
@@ -59,12 +69,13 @@ class ControllerViewModel : ViewModel() {
     }
 
     private fun send(part: Part, action: Action) {
-        wsRepo.sendCommand(part.value, action.value)
+        // opcional: proteger caso wsRepo.sendCommand possa lançar exceção
+        runCatching { wsRepo.sendCommand(part.value, action.value) }
+            .onFailure { t -> Log.e(TAG, "sendCommand failed", t) }
     }
 
     private fun handleButton(code: Int, pressed: Boolean) {
         when (code) {
-
             KeyEvent.KEYCODE_DPAD_LEFT ->
                 repeatWhilePressed(pressed) { send(Part.Base, Action.LEFT) }
 
@@ -97,7 +108,6 @@ class ControllerViewModel : ViewModel() {
         }
     }
 
-
     private var demoOn = false
     private fun toggleDemo() {
         demoOn = !demoOn
@@ -108,9 +118,7 @@ class ControllerViewModel : ViewModel() {
         if (pressed) {
             if (repeatJob?.isActive == true) return
             repeatJob = viewModelScope.launch {
-
                 send()
-
                 while (true) {
                     delay(90)
                     send()

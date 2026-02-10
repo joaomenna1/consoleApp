@@ -17,6 +17,7 @@ import com.example.consoleapp.ui.components.TopHeader
 import com.example.consoleapp.domain.input.JoystickEvent
 import androidx.compose.foundation.background
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.LaunchedEffect
 
 
 
@@ -24,6 +25,9 @@ import androidx.compose.material3.MaterialTheme
 fun ControllerScreen(
     vm: ControllerViewModel
 ) {
+    LaunchedEffect(Unit) {
+        vm.ensureConnected()
+    }
     val state by vm.uiState.collectAsState()
 
     Column(
