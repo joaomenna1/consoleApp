@@ -23,16 +23,15 @@ class WebSocketRepository(
         onDisconnected: (() -> Unit)? = null,
         onError: ((Throwable) -> Unit)? = null
     ) {
-        val url = HttpUrl.Builder()
-            .scheme("ws")
-            .host(host)
-            .port(port)
-            .encodedPath(path)
-            .build()
+        val cleanPath = if (path.startsWith("/")) path else "/$path"
+        val url =  "ws://$host:$port$cleanPath"
 
         Log.d(TAG, "Connecting -> $url")
 
-        val req = Request.Builder().url(url).build()
+        val req = Request.Builder()
+            .url(url)
+            .build()
+
         socket = client.newWebSocket(req, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 _isConnected.set(true)
